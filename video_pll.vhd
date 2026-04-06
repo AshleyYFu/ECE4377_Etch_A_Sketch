@@ -43,10 +43,10 @@ USE altera_mf.all;
 ENTITY video_pll IS
 	PORT
 	(
-		areset		: IN STD_LOGIC  := '0';
+		--areset		: IN STD_LOGIC  := '0';
 		inclk0		: IN STD_LOGIC  := '0';
-		c0		: OUT STD_LOGIC ;
-		locked		: OUT STD_LOGIC 
+		c0				: OUT STD_LOGIC 
+		--locked		: OUT STD_LOGIC 
 	);
 END video_pll;
 
@@ -122,10 +122,10 @@ ARCHITECTURE SYN OF video_pll IS
 		width_clock		: NATURAL
 	);
 	PORT (
-			areset	: IN STD_LOGIC ;
+			--areset	: IN STD_LOGIC ;
 			inclk	: IN STD_LOGIC_VECTOR (1 DOWNTO 0);
-			clk	: OUT STD_LOGIC_VECTOR (4 DOWNTO 0);
-			locked	: OUT STD_LOGIC 
+			clk	: OUT STD_LOGIC_VECTOR (4 DOWNTO 0)
+			--locked	: OUT STD_LOGIC 
 	);
 	END COMPONENT;
 
@@ -136,17 +136,17 @@ BEGIN
 	sub_wire1    <= sub_wire2(0 DOWNTO 0) & sub_wire0;
 	sub_wire4    <= sub_wire3(0);
 	c0    <= sub_wire4;
-	locked    <= sub_wire5;
+--	locked    <= sub_wire5;
 
 	altpll_component : altpll
 	GENERIC MAP (
 		bandwidth_type => "AUTO",
-		clk0_divide_by => 1,
+		clk0_divide_by => 2,
 		clk0_duty_cycle => 50,
 		clk0_multiply_by => 1,
 		clk0_phase_shift => "0",
 		compensate_clock => "CLK0",
-		inclk0_input_frequency => 10000,
+		inclk0_input_frequency => 20000,
 		intended_device_family => "Cyclone IV E",
 		lpm_hint => "CBX_MODULE_PREFIX=video_pll",
 		lpm_type => "altpll",
@@ -197,10 +197,10 @@ BEGIN
 		width_clock => 5
 	)
 	PORT MAP (
-		areset => areset,
+--		areset => areset,
 		inclk => sub_wire1,
-		clk => sub_wire3,
-		locked => sub_wire5
+		clk => sub_wire3
+--		locked => sub_wire5
 	);
 
 

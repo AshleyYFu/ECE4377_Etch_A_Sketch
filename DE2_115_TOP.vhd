@@ -130,12 +130,10 @@ SIGNAL pixel_column_int :STD_LOGIC_VECTOR(9 DOWNTO 0);
 
 
 BEGIN
-	
 	red_int   <= (others => '1');
-   green_int <= (others => '0');
-   blue_int  <= (others => '0');
-
-   VGA_SYNC_N <= '0';
+	green_int <= (others => '0');
+	blue_int  <= (others => '0');
+	VGA_SYNC_N <= '0';
 
 	VGA_HS <= horiz_sync_int;
 	VGA_VS <= vert_sync_int;
