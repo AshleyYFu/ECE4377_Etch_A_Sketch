@@ -75,7 +75,12 @@ entity DE2_115_TOP is
         AUD_BCLK    : inout std_logic;
         AUD_DACDAT  : out   std_logic;
         AUD_DACLRCK : inout std_logic;
-        AUD_XCK     : out   std_logic
+        AUD_XCK     : out   std_logic;
+		  
+		  -- Rotary encoder inputs (from GPIO header)
+        ENC_A_IN : in std_logic;
+        ENC_B_IN : in std_logic;
+
     );
 end DE2_115_TOP;
 
@@ -115,15 +120,26 @@ architecture structural of DE2_115_TOP is
     signal pixel_clock_int: std_logic;
     signal pixel_row_int  : std_logic_vector(9 downto 0);
     signal pixel_column_int: std_logic_vector(9 downto 0);
+	 
+	 -- Encoder signals
+	 signal enc_a_sig, enc_b_sig : std_logic;
+	 signal bcd_h, bcd_t, bcd_o : unsigned(3 downto 0);
+
+
 
 begin
-
+	 -- vga signals
     VGA_SYNC_N <= '0';
     VGA_HS     <= horiz_sync_int;
     VGA_VS     <= vert_sync_int;
     VGA_R      <= vga_r_int;
     VGA_G      <= vga_g_int;
     VGA_B      <= vga_b_int;
+	 
+	 -- reads encoder signals
+	 enc_a_sig <= ENC_A_IN;
+	 enc_b_sig <= ENC_B_IN;
+
 
     U1 : VGA_SYNC_module
         port map (
@@ -154,5 +170,20 @@ begin
             keys         => KEY(3 downto 0),
             switches     => SW(0 downto 0)
         );
+		  
+	ENC_TEST : entity work.rotary_encoder_test
+    port map (
+        clk      => CLOCK_50,
+        reset_n  => KEY(0),   -- KEY0 as reset
+        enc_a    => enc_a_sig,
+        enc_b    => enc_b_sig,
+        hundreds => bcd_h,
+        tens     => bcd_t,
+        ones     => bcd_o
+    );
+	 
+	 HEX0_DEC : entity work.hex7seg port map (bin => bcd_o, seg => HEX0);
+	 HEX1_DEC : entity work.hex7seg port map (bin => bcd_t, seg => HEX1);
+	 HEX2_DEC : entity work.hex7seg port map (bin => bcd_h, seg => HEX2);
 
 end structural;
