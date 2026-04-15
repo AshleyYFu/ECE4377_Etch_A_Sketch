@@ -14,6 +14,11 @@ entity DE2_115_TOP is
         SMA_CLKIN  : in  std_logic;
         SMA_CLKOUT : out std_logic;
 
+        -- GPIO Ports
+        -- GPIO(0) / GPIO(1) = X encoder
+        -- GPIO(2) / GPIO(3) = Y encoder
+        GPIO : in std_logic_vector(3 downto 0);
+
         -- Buttons and switches
         KEY : in std_logic_vector(3 downto 0);
         SW  : in std_logic_vector(17 downto 0);
@@ -87,43 +92,65 @@ architecture structural of DE2_115_TOP is
             red, green, blue                     : in  std_logic_vector(7 downto 0);
             red_out, green_out, blue_out         : out std_logic_vector(7 downto 0);
             horiz_sync_out, vert_sync_out,
-            video_on, pixel_clock               : out std_logic;
-            pixel_row, pixel_column             : out std_logic_vector(9 downto 0)
+            video_on, pixel_clock                : out std_logic;
+            pixel_row, pixel_column              : out std_logic_vector(9 downto 0)
         );
     end component;
+
+    component rotary_encoder
+    generic (
+        START_COUNT : integer := 0
+    );
+    port (
+        CLOCK_50 : in  std_logic;
+        RESET_N   : in  std_logic;
+        ENC_A     : in  std_logic;
+        ENC_B     : in  std_logic;
+        COUNT     : out integer range 0 to 999
+    );
+	end component;
 
     component etch_a_sketch
-        port (
-            clock_50                 : in  std_logic;
-            pixel_row, pixel_column  : in  std_logic_vector(9 downto 0);
-            Red, Green, Blue         : out std_logic_vector(7 downto 0);
-            Vert_sync                : in  std_logic;
-            keys                     : in  std_logic_vector(3 downto 0);
-            switches                 : in  std_logic_vector(0 downto 0)
-        );
-    end component;
+    port (
+        clock_50     : in  std_logic;
+        pixel_row    : in  std_logic_vector(9 downto 0);
+        pixel_column : in  std_logic_vector(9 downto 0);
+        x_count      : in  integer range 0 to 999;
+        y_count      : in  integer range 0 to 999;
+        switches     : in  std_logic_vector(0 downto 0);
+        red          : out std_logic_vector(7 downto 0);
+        green        : out std_logic_vector(7 downto 0);
+        blue         : out std_logic_vector(7 downto 0)
+    );
+	end component;
 
-    signal red_int        : std_logic_vector(7 downto 0);
-    signal green_int      : std_logic_vector(7 downto 0);
-    signal blue_int       : std_logic_vector(7 downto 0);
-    signal vga_r_int      : std_logic_vector(7 downto 0);
-    signal vga_g_int      : std_logic_vector(7 downto 0);
-    signal vga_b_int      : std_logic_vector(7 downto 0);
-    signal video_on_int   : std_logic;
-    signal vert_sync_int  : std_logic;
-    signal horiz_sync_int : std_logic;
-    signal pixel_clock_int: std_logic;
-    signal pixel_row_int  : std_logic_vector(9 downto 0);
-    signal pixel_column_int: std_logic_vector(9 downto 0);
+    signal red_int          : std_logic_vector(7 downto 0);
+    signal green_int        : std_logic_vector(7 downto 0);
+    signal blue_int         : std_logic_vector(7 downto 0);
+    signal vga_r_int        : std_logic_vector(7 downto 0);
+    signal vga_g_int        : std_logic_vector(7 downto 0);
+    signal vga_b_int        : std_logic_vector(7 downto 0);
+    signal video_on_int     : std_logic;
+    signal vert_sync_int    : std_logic;
+    signal horiz_sync_int   : std_logic;
+    signal pixel_clock_int  : std_logic;
+    signal pixel_row_int    : std_logic_vector(9 downto 0);
+    signal pixel_column_int : std_logic_vector(9 downto 0);
+
+    signal x_count : integer range 0 to 999 := 0;
+    signal y_count : integer range 0 to 999 := 0;
+
 
 begin
 
-    VGA_SYNC_N <= '0';
-    VGA_HS     <= horiz_sync_int;
-    VGA_VS     <= vert_sync_int;
-    VGA_R      <= vga_r_int;
-    VGA_G      <= vga_g_int;
-    VGA_B      <= vga_b_int;
+    VGA_SYNC_N  <= '0';
+    VGA_HS      <= horiz_sync_int;
+    VGA_VS      <= vert_sync_int;
+    VGA_BLANK_N <= video_on_int;
+    VGA_R       <= vga_r_int;
+    VGA_G       <= vga_g_int;
+    VGA_B       <= vga_b_int;
+    VGA_CLK     <= pixel_clock_int;
 
     U1 : VGA_SYNC_module
         port map (
@@ -136,23 +163,47 @@ begin
             blue_out       => vga_b_int,
             horiz_sync_out => horiz_sync_int,
             vert_sync_out  => vert_sync_int,
-            video_on       => VGA_BLANK_N,
-            pixel_clock    => VGA_CLK,
+            video_on       => video_on_int,
+            pixel_clock    => pixel_clock_int,
             pixel_row      => pixel_row_int,
             pixel_column   => pixel_column_int
         );
 
+U_X : entity work.rotary_encoder
+    generic map (
+        START_COUNT => 320
+    )
+    port map (
+        CLOCK_50 => CLOCK_50,
+        RESET_N  => KEY(0),
+        ENC_A    => GPIO(0),
+        ENC_B    => GPIO(1),
+        COUNT    => x_count
+    );
+
+U_Y : entity work.rotary_encoder
+    generic map (
+        START_COUNT => 240
+    )
+    port map (
+        CLOCK_50 => CLOCK_50,
+        RESET_N  => KEY(0),
+        ENC_A    => GPIO(2),
+        ENC_B    => GPIO(3),
+        COUNT    => y_count
+    );
+
     U2 : etch_a_sketch
-        port map (
-            clock_50     => CLOCK_50,
-            pixel_row    => pixel_row_int,
-            pixel_column => pixel_column_int,
-            red          => red_int,
-            green        => green_int,
-            blue         => blue_int,
-            vert_sync    => vert_sync_int,
-            keys         => KEY(3 downto 0),
-            switches     => SW(0 downto 0)
-        );
+    port map (
+        clock_50     => CLOCK_50,
+        pixel_row    => pixel_row_int,
+        pixel_column => pixel_column_int,
+        x_count      => x_count,
+        y_count      => y_count,
+        switches     => SW(0 downto 0),
+        red          => red_int,
+        green        => green_int,
+        blue         => blue_int
+    );
 
 end structural;

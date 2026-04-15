@@ -2,16 +2,14 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Module moves cursor according to key buttons
-
 entity etch_a_sketch is
     port (
-        clock_50         : in  std_logic;                     -- 50 MHz system clock for the RAM
-        pixel_row        : in  std_logic_vector(9 downto 0);  -- From VGA sync
-        pixel_column     : in  std_logic_vector(9 downto 0);  -- From VGA sync
-        keys             : in  std_logic_vector(3 downto 0);  -- D-Pad buttons
-        switches         : in  std_logic_vector(0 downto 0);  -- Pen down toggle
-        vert_sync        : in  std_logic;                     -- 60 Hz clock for smooth movement
+        clock_50         : in  std_logic;
+        pixel_row        : in  std_logic_vector(9 downto 0);
+        pixel_column     : in  std_logic_vector(9 downto 0);
+        x_count          : in  integer range 0 to 999;
+        y_count          : in  integer range 0 to 999;
+        switches         : in  std_logic_vector(0 downto 0);
         red, green, blue : out std_logic_vector(7 downto 0)
     );
 end etch_a_sketch;
@@ -29,19 +27,21 @@ architecture behavior of etch_a_sketch is
         );
     end component;
 
-    signal cursor_x    : integer range 0 to 639 := 320;
-    signal cursor_y    : integer range 0 to 479 := 240;
-    signal write_addr  : std_logic_vector(18 downto 0);
-    signal read_addr   : std_logic_vector(18 downto 0);
-    signal pixel_data  : std_logic_vector(0 downto 0);
-    signal is_cursor   : std_logic;
+    signal cursor_x   : integer range 0 to 639;
+    signal cursor_y   : integer range 0 to 479;
+    signal write_addr : std_logic_vector(18 downto 0);
+    signal read_addr  : std_logic_vector(18 downto 0);
+    signal pixel_data : std_logic_vector(0 downto 0);
+    signal is_cursor  : std_logic;
 
 begin
 
-    -- Compute write address from integer cursor position
+    -- 1:1 pixel movement with wraparound
+    cursor_x <= x_count mod 640;
+    cursor_y <= y_count mod 480;
+
     write_addr <= std_logic_vector(to_unsigned((cursor_y * 640) + cursor_x, 19));
 
-    -- Compute read address from pixel_row/pixel_column; guard against out-of-range
     read_addr <= std_logic_vector(
                      to_unsigned(
                          to_integer(unsigned(pixel_row)) * 640 + to_integer(unsigned(pixel_column)),
@@ -52,33 +52,13 @@ begin
     canvas : framebuffer
         port map (
             clock     => clock_50,
-            data      => "1",           -- always write '1' (white) to the trail
-            rdaddress => read_addr,     -- VGA reads from this address
-            wraddress => write_addr,    -- cursor writes to this address
-            wren      => switches(0),   -- SW(0) toggles pen on/off
-            q         => pixel_data     -- pixel value out of memory
+            data      => "1",
+            rdaddress => read_addr,
+            wraddress => write_addr,
+            wren      => switches(0),
+            q         => pixel_data
         );
 
-    Move_Cursor : process (vert_sync)
-    begin
-        if rising_edge(vert_sync) then
-            -- DE2-115 keys are active low (0 = pressed)
-            if keys(3) = '0' and cursor_y > 0 then
-                cursor_y <= cursor_y - 1;
-            end if;
-            if keys(2) = '0' and cursor_y < 479 then
-                cursor_y <= cursor_y + 1;
-            end if;
-            if keys(1) = '0' and cursor_x > 0 then
-                cursor_x <= cursor_x - 1;
-            end if;
-            if keys(0) = '0' and cursor_x < 639 then
-                cursor_x <= cursor_x + 1;
-            end if;
-        end if;
-    end process;
-
-    -- Draw cursor as a 4x4 red box
     is_cursor <= '1' when (
                      to_integer(unsigned(pixel_column)) >= cursor_x and
                      to_integer(unsigned(pixel_column)) <= cursor_x + 3 and
@@ -86,7 +66,6 @@ begin
                      to_integer(unsigned(pixel_row))    <= cursor_y + 3)
                  else '0';
 
-    -- Paint screen: cursor > trail > background
     process (is_cursor, pixel_data)
     begin
         if is_cursor = '1' then
