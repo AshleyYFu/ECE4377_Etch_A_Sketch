@@ -5,9 +5,7 @@ use ieee.numeric_std.all;
 entity drawing_engine is
     generic (
         SCREEN_W        : integer := 640;
-        SCREEN_H        : integer := 480;
-        STAMP_RADIUS    : integer := 10;         -- stamp half-size
-        DEBOUNCE_CYCLES : integer := 500000      -- ~10ms @50MHz
+        SCREEN_H        : integer := 480
     );
     port (
         clock_50     : in  std_logic;
@@ -27,7 +25,7 @@ entity drawing_engine is
         pen_enable   : in  std_logic;
 
         -- Stamp keys (active-low): KEY1 square, KEY2 circle, KEY3 star
-        key_square_n : in  std_logic;
+        key_heart_n : in  std_logic;
         key_circle_n : in  std_logic;
         key_star_n   : in  std_logic;
 
@@ -51,12 +49,66 @@ architecture rtl of drawing_engine is
             q         : out std_logic_vector(2 downto 0)
         );
     end component;
-
-    -- Helpers
-    function iabs(x : integer) return integer is
-    begin
-        if x < 0 then return -x; else return x; end if;
-    end function;
+  
+	 -- stamp constants
+	 type stamp_type is array(0 to 15) of std_logic_vector(0 to 15);
+	 
+	 constant HEART_STAMP : stamp_type := (
+        "0000000000000000", 
+		  "0011110000111100", 
+		  "0111111001111110", 
+		  "1111111111111111",
+        "1111111111111111", 
+		  "1111111111111111", 
+		  "0111111111111110", 
+		  "0011111111111100",
+        "0001111111111000", 
+		  "0000111111110000", 
+		  "0000011111100000", 
+		  "0000001111000000",
+        "0000000110000000", 
+		  "0000000000000000", 
+		  "0000000000000000", 
+		  "0000000000000000"
+    );
+	 
+	 constant CIRCLE_STAMP : stamp_type := (
+        "0000011111100000",
+        "0001111111111000",
+        "0011111111111100",
+        "0111111111111110",
+        "0111111111111110",
+        "1111111111111111",
+        "1111111111111111",
+        "1111111111111111",
+        "1111111111111111",
+        "1111111111111111",
+        "1111111111111111",
+        "0111111111111110",
+        "0111111111111110",
+        "0011111111111100",
+        "0001111111111000",
+        "0000011111100000"
+    );
+	 
+	 constant STAR_STAMP : stamp_type := (
+	     "0000000110000000", 
+		  "0000000110000000", 
+		  "0000001111000000", 
+		  "0000001111000000",
+        "0000011111100000", 
+		  "1111111111111111", 
+		  "0111111111111110", 
+		  "0011111111111100",
+        "0001111111111000", 
+		  "0001111111111000", 
+		  "0011110000111100", 
+		  "0011100000011100",
+        "0111000000001110", 
+		  "0110000000000110", 
+		  "0000000000000000", 
+		  "0000000000000000"
+    );
 
     -- Current selected pen color (stored as [2:0]=RGB with bit2=R)
     signal pen_color : std_logic_vector(2 downto 0);
@@ -78,24 +130,15 @@ architecture rtl of drawing_engine is
     signal moved_now : std_logic;
 
     -- Debounce structures for 3 keys
-    signal ksq_sync1, ksq_sync2 : std_logic := '1';
+    signal kht_sync1, kht_sync2 : std_logic := '1';
     signal kci_sync1, kci_sync2 : std_logic := '1';
     signal kst_sync1, kst_sync2 : std_logic := '1';
 
-    signal ksq_db, kci_db, kst_db : std_logic := '1';
-    signal ksq_db_prev, kci_db_prev, kst_db_prev : std_logic := '1';
-
-    signal ksq_cnt : integer range 0 to DEBOUNCE_CYCLES := 0;
-    signal kci_cnt : integer range 0 to DEBOUNCE_CYCLES := 0;
-    signal kst_cnt : integer range 0 to DEBOUNCE_CYCLES := 0;
-
-    signal pulse_square, pulse_circle, pulse_star : std_logic := '0';
-
     -- Stamp state
-    type stamp_shape_t is (NONE, SQUARE, CIRCLE, STAR);
+    type stamp_shape_t is (NONE, HEART, CIRCLE, STAR);
     signal stamp_active : std_logic := '0';
     signal stamp_shape  : stamp_shape_t := NONE;
-    signal dx, dy       : integer range -STAMP_RADIUS to STAMP_RADIUS := 0;
+    signal dx, dy       : integer range 0 to 15 := 0;
 
     -- Write control to framebuffer
     signal wren_int  : std_logic;
@@ -115,8 +158,9 @@ begin
     -- SW0=R, SW1=G, SW2=B; if all off => default white.
     -- Store in [2:0] where bit2=R, bit1=G, bit0=B
     --------------------------------------------------------------------
-    pen_color <= "111" when sw_rgb = "000"
-                 else (sw_rgb(0) & sw_rgb(1) & sw_rgb(2));
+    pen_color <= "111" when sw_rgb = "000" else
+					  "000" when sw_rgb = "111" else
+					  (sw_rgb(2) & sw_rgb(1) & sw_rgb(0));
 
     --------------------------------------------------------------------
     -- VGA read address mapping (safe only inside visible 640x480)
@@ -147,47 +191,30 @@ begin
     --------------------------------------------------------------------
     -- Compute stamp coordinates for current dx/dy
     --------------------------------------------------------------------
-    stamp_x <= cursor_x + dx;
-    stamp_y <= cursor_y + dy;
+    stamp_x <= cursor_x - 8 + dx;
+    stamp_y <= cursor_y - 8 + dy;
 
     stamp_in_bounds <= '1' when (stamp_x >= 0 and stamp_x < SCREEN_W and stamp_y >= 0 and stamp_y < SCREEN_H)
                        else '0';
 
     --------------------------------------------------------------------
-    -- Shape mask (filled square / circle / "asterisk star")
+    -- Shape mask (HEART / CIRCLE / STAR) - simple version
     --------------------------------------------------------------------
-    process(dx, dy, stamp_shape)
-        variable r2 : integer;
-        variable d2 : integer;
+	 process(dx, dy, stamp_shape)
     begin
         mask_on <= '0';
-        r2 := STAMP_RADIUS * STAMP_RADIUS;
-        d2 := dx*dx + dy*dy;
-
         case stamp_shape is
-            when SQUARE =>
-                if (iabs(dx) <= STAMP_RADIUS) and (iabs(dy) <= STAMP_RADIUS) then
-                    mask_on <= '1';
-                end if;
-
+            when HEART =>
+                mask_on <= HEART_STAMP(dy)(dx);
             when CIRCLE =>
-                if d2 <= r2 then
-                    mask_on <= '1';
-                end if;
-
+                mask_on <= CIRCLE_STAMP(dy)(dx);
             when STAR =>
-                -- Asterisk-style star: + and X combined (easy to expand later)
-                if (iabs(dx) <= 1) or (iabs(dy) <= 1) or (iabs(dx - dy) <= 1) or (iabs(dx + dy) <= 1) then
-                    if (iabs(dx) <= STAMP_RADIUS) and (iabs(dy) <= STAMP_RADIUS) then
-                        mask_on <= '1';
-                    end if;
-                end if;
-
+                mask_on <= STAR_STAMP(dy)(dx);
             when others =>
                 mask_on <= '0';
         end case;
     end process;
-
+	
     --------------------------------------------------------------------
     -- Choose write address/data/wren
     -- Priority: stamping > pen movement
@@ -219,65 +246,15 @@ begin
         );
 
     --------------------------------------------------------------------
-    -- Debounce + one-pulse generation for stamp keys
+    -- stamp keys
     --------------------------------------------------------------------
     process(clock_50)
     begin
         if rising_edge(clock_50) then
             -- 2-flop synchronizers (keys are asynchronous)
-            ksq_sync1 <= key_square_n;  ksq_sync2 <= ksq_sync1;
+            kht_sync1 <= key_heart_n;   kht_sync2 <= kht_sync1;
             kci_sync1 <= key_circle_n;  kci_sync2 <= kci_sync1;
             kst_sync1 <= key_star_n;    kst_sync2 <= kst_sync1;
-
-            -- Debounce for square
-            if ksq_sync2 /= ksq_db then
-                ksq_cnt <= 0;
-            elsif ksq_cnt < DEBOUNCE_CYCLES then
-                ksq_cnt <= ksq_cnt + 1;
-            else
-                ksq_db <= ksq_sync2;
-            end if;
-
-            -- Debounce for circle
-            if kci_sync2 /= kci_db then
-                kci_cnt <= 0;
-            elsif kci_cnt < DEBOUNCE_CYCLES then
-                kci_cnt <= kci_cnt + 1;
-            else
-                kci_db <= kci_sync2;
-            end if;
-
-            -- Debounce for star
-            if kst_sync2 /= kst_db then
-                kst_cnt <= 0;
-            elsif kst_cnt < DEBOUNCE_CYCLES then
-                kst_cnt <= kst_cnt + 1;
-            else
-                kst_db <= kst_sync2;
-            end if;
-
-		-- One-shot pulses on press (active-low: press is 1->0 transition)
-				if (ksq_db_prev = '1' and ksq_db = '0') then
-					pulse_square <= '1';
-				else
-					pulse_square <= '0';
-				end if;
-
-				if (kci_db_prev = '1' and kci_db = '0') then
-					pulse_circle <= '1';
-				else
-					pulse_circle <= '0';
-				end if;
-
-				if (kst_db_prev = '1' and kst_db = '0') then
-					pulse_star <= '1';
-				else
-					pulse_star <= '0';
-				end if;
-
-            ksq_db_prev <= ksq_db;
-            kci_db_prev <= kci_db;
-            kst_db_prev <= kst_db;
 
             -- Track previous cursor
             prev_x <= cursor_x;
@@ -285,32 +262,32 @@ begin
 
             -- Stamp state machine
             if stamp_active = '0' then
-                if pulse_square = '1' then
+					 if kht_sync2 = '0' then
                     stamp_active <= '1';
-                    stamp_shape  <= SQUARE;
-                    dx <= -STAMP_RADIUS;
-                    dy <= -STAMP_RADIUS;
-                elsif pulse_circle = '1' then
+                    stamp_shape  <= HEART;
+                    dx <= 0;
+                    dy <= 0;
+					 elsif kci_sync2 = '0' then
                     stamp_active <= '1';
                     stamp_shape  <= CIRCLE;
-                    dx <= -STAMP_RADIUS;
-                    dy <= -STAMP_RADIUS;
-                elsif pulse_star = '1' then
+                    dx <= 0;
+                    dy <= 0;
+					 elsif kst_sync2 = '0' then
                     stamp_active <= '1';
                     stamp_shape  <= STAR;
-                    dx <= -STAMP_RADIUS;
-                    dy <= -STAMP_RADIUS;
+                    dx <= 0;
+                    dy <= 0;
                 end if;
             else
-                -- Advance through bounding box (one pixel per clock)
-                if (dx = STAMP_RADIUS) and (dy = STAMP_RADIUS) then
+                -- Advance through 16x16 grid
+                if (dx = 15) and (dy = 15) then
                     stamp_active <= '0';
                     stamp_shape  <= NONE;
                     dx <= 0;
                     dy <= 0;
                 else
-                    if dx = STAMP_RADIUS then
-                        dx <= -STAMP_RADIUS;
+                    if dx = 15 then
+                        dx <= 0;
                         dy <= dy + 1;
                     else
                         dx <= dx + 1;
@@ -331,10 +308,15 @@ begin
             green <= (others => '0');
             blue  <= (others => '0');
         elsif pix_rgb = "000" then
-            -- background (same as your prior design): blue
-            red   <= (others => '0');
-            green <= (others => '0');
+            -- background (white)
+            red   <= (others => '1');
+            green <= (others => '1');
             blue  <= (others => '1');
+		  elsif pix_rgb = "111" then
+		      -- black pen
+		      red   <= (others => '0');
+            green <= (others => '0');
+            blue  <= (others => '0');
         else
             -- Expand 1-bit channels to 8-bit
             rbit := pix_rgb(2);

@@ -17,7 +17,7 @@ entity DE2_115_TOP is
         -- GPIO Ports
         -- GPIO(0) / GPIO(1) = X encoder
         -- GPIO(2) / GPIO(3) = Y encoder
-        GPIO : in std_logic_vector(3 downto 0);
+        GPIO : inout std_logic_vector(35 downto 0);
 
         -- Buttons and switches
         KEY : in std_logic_vector(3 downto 0);
@@ -138,8 +138,8 @@ architecture structural of DE2_115_TOP is
     signal pixel_row_int    : std_logic_vector(9 downto 0);
     signal pixel_column_int : std_logic_vector(9 downto 0);
 
-    signal x_count : integer range 0 to 999 := 0;
-    signal y_count : integer range 0 to 999 := 0;
+    signal x_count : integer range 0 to 999;
+    signal y_count : integer range 0 to 999;
 
 
 begin
@@ -170,8 +170,8 @@ begin
             pixel_column   => pixel_column_int
         );
 
-U_X : entity work.rotary_encoder
-    generic map (
+   U_X : entity work.rotary_encoder
+   generic map (
         START_COUNT => 320
     )
     port map (
@@ -182,7 +182,7 @@ U_X : entity work.rotary_encoder
         COUNT    => x_count
     );
 
-U_Y : entity work.rotary_encoder
+    U_Y : entity work.rotary_encoder
     generic map (
         START_COUNT => 240
     )
@@ -202,7 +202,9 @@ U_Y : entity work.rotary_encoder
 		x_count      => x_count,
 		y_count      => y_count,
 		switches     => SW(3 downto 0),     -- SW0..2 RGB, SW3 pen enable
-		keys_stamp_n => KEY(3 downto 1),    -- KEY1..3 stamp
+		keys_stamp_n(1) => KEY(1),          -- Heart Stamp
+      keys_stamp_n(2) => KEY(2),          -- Circle Stamp
+      keys_stamp_n(3) => KEY(3),          -- Star Stamp
 		red          => red_int,
 		green        => green_int,
 		blue         => blue_int

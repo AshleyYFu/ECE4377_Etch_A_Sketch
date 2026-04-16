@@ -25,9 +25,7 @@ architecture behavior of etch_a_sketch is
     component drawing_engine is
         generic (
             SCREEN_W        : integer := 640;
-            SCREEN_H        : integer := 480;
-            STAMP_RADIUS    : integer := 10;
-            DEBOUNCE_CYCLES : integer := 500000
+            SCREEN_H        : integer := 480
         );
         port (
             clock_50     : in  std_logic;
@@ -37,7 +35,7 @@ architecture behavior of etch_a_sketch is
             cursor_y     : in  integer range 0 to 479;
             sw_rgb       : in  std_logic_vector(2 downto 0);
             pen_enable   : in  std_logic;
-            key_square_n : in  std_logic;
+            key_heart_n  : in  std_logic;
             key_circle_n : in  std_logic;
             key_star_n   : in  std_logic;
             red          : out std_logic_vector(7 downto 0);
@@ -63,7 +61,7 @@ begin
             cursor_y     => cursor_y,
             sw_rgb       => switches(2 downto 0),
             pen_enable   => switches(3),
-            key_square_n => keys_stamp_n(1),
+            key_heart_n  => keys_stamp_n(1),
             key_circle_n => keys_stamp_n(2),
             key_star_n   => keys_stamp_n(3),
             red          => red,
