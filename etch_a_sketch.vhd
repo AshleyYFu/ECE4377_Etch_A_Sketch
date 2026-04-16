@@ -15,6 +15,8 @@ entity etch_a_sketch is
 
         -- KEY(3:1) used for stamping (active-low)
         keys_stamp_n     : in  std_logic_vector(3 downto 1);
+		  
+		  clear_n : in std_logic;
 
         red, green, blue : out std_logic_vector(7 downto 0)
     );
@@ -38,6 +40,7 @@ architecture behavior of etch_a_sketch is
             key_heart_n  : in  std_logic;
             key_circle_n : in  std_logic;
             key_star_n   : in  std_logic;
+				clear_n 		 : in std_logic;
             red          : out std_logic_vector(7 downto 0);
             green        : out std_logic_vector(7 downto 0);
             blue         : out std_logic_vector(7 downto 0)
@@ -64,6 +67,7 @@ begin
             key_heart_n  => keys_stamp_n(1),
             key_circle_n => keys_stamp_n(2),
             key_star_n   => keys_stamp_n(3),
+				clear_n 		 => clear_n,
             red          => red,
             green        => green,
             blue         => blue

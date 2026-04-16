@@ -111,19 +111,20 @@ architecture structural of DE2_115_TOP is
 	end component;
 
     component etch_a_sketch
-	 port (
-			clock_50         : in  std_logic;
-			pixel_row        : in  std_logic_vector(9 downto 0);
-			pixel_column     : in  std_logic_vector(9 downto 0);
-			x_count          : in  integer range 0 to 999;
-			y_count          : in  integer range 0 to 999;
-			switches         : in  std_logic_vector(3 downto 0);
-			keys_stamp_n     : in  std_logic_vector(3 downto 1);
-			red              : out std_logic_vector(7 downto 0);
-			green            : out std_logic_vector(7 downto 0);
-			blue             : out std_logic_vector(7 downto 0)
-		);
-		end component;
+	  port (
+		clock_50         : in  std_logic;
+		pixel_row        : in  std_logic_vector(9 downto 0);
+		pixel_column     : in  std_logic_vector(9 downto 0);
+		x_count          : in  integer range 0 to 999;
+		y_count          : in  integer range 0 to 999;
+		switches         : in  std_logic_vector(3 downto 0);
+		keys_stamp_n     : in  std_logic_vector(3 downto 1);
+		clear_n          : in  std_logic; 
+		red              : out std_logic_vector(7 downto 0);
+		green            : out std_logic_vector(7 downto 0);
+		blue             : out std_logic_vector(7 downto 0)
+	 );
+	end component;
 
     signal red_int          : std_logic_vector(7 downto 0);
     signal green_int        : std_logic_vector(7 downto 0);
@@ -205,6 +206,7 @@ begin
 		keys_stamp_n(1) => KEY(1),          -- Heart Stamp
       keys_stamp_n(2) => KEY(2),          -- Circle Stamp
       keys_stamp_n(3) => KEY(3),          -- Star Stamp
+		clear_n      => KEY(0),
 		red          => red_int,
 		green        => green_int,
 		blue         => blue_int

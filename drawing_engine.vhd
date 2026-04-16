@@ -28,6 +28,9 @@ entity drawing_engine is
         key_heart_n : in  std_logic;
         key_circle_n : in  std_logic;
         key_star_n   : in  std_logic;
+		  
+		  -- reset key
+		  clear_n : in std_logic;
 
         -- VGA output color
         red          : out std_logic_vector(7 downto 0);
@@ -150,6 +153,15 @@ architecture rtl of drawing_engine is
 
     -- Shape mask for current (dx,dy)
     signal mask_on : std_logic;
+	 
+	 -- reset constants
+	 constant FB_SIZE : integer := SCREEN_W * SCREEN_H;  -- 307200 for 640x480
+
+	 signal clr_sync1, clr_sync2 : std_logic := '1';
+    signal clr_prev             : std_logic := '1';
+
+    signal clear_active : std_logic := '0';
+    signal clear_addr   : integer range 0 to FB_SIZE-1 := 0;
 
 begin
 
@@ -219,16 +231,21 @@ begin
     -- Choose write address/data/wren
     -- Priority: stamping > pen movement
     --------------------------------------------------------------------
-    write_addr <= std_logic_vector(to_unsigned((stamp_y * SCREEN_W) + stamp_x, 19))
-                 when (stamp_active = '1' and stamp_in_bounds = '1')
-                 else std_logic_vector(to_unsigned((cursor_y * SCREEN_W) + cursor_x, 19));
+					  
+	 write_addr <= std_logic_vector(to_unsigned(clear_addr, 19))
+             when (clear_active = '1')
+             else std_logic_vector(to_unsigned((stamp_y * SCREEN_W) + stamp_x, 19))
+             when (stamp_active = '1' and stamp_in_bounds = '1')
+             else std_logic_vector(to_unsigned((cursor_y * SCREEN_W) + cursor_x, 19));
 
-    wdata_int <= pen_color;
-
-    wren_int <=
+	 
+	 wdata_int <= "000" when (clear_active = '1') else pen_color;
+		  
+	 wren_int <=
+		  '1' when (clear_active = '1') else
         -- Stamp writes: for each stamp pixel where mask is on and in bounds
         '1' when (stamp_active = '1' and stamp_in_bounds = '1' and mask_on = '1') else
-        -- Pen write once per movement
+		  -- Pen write once per movement
         '1' when (stamp_active = '0' and pen_enable = '1' and moved_now = '1') else
         '0';
 
@@ -255,11 +272,40 @@ begin
             kht_sync1 <= key_heart_n;   kht_sync2 <= kht_sync1;
             kci_sync1 <= key_circle_n;  kci_sync2 <= kci_sync1;
             kst_sync1 <= key_star_n;    kst_sync2 <= kst_sync1;
+				
+
+				-- 2-flop synchronizer for CLEAR key (KEY0), active-low
+				clr_sync1 <= clear_n;
+				clr_sync2 <= clr_sync1;
 
             -- Track previous cursor
             prev_x <= cursor_x;
             prev_y <= cursor_y;
+				
 
+				-- Detect KEY0 press (falling edge) and START clearing
+				if (clr_prev = '1' and clr_sync2 = '0') then
+					clear_active <= '1';
+					clear_addr   <= 0;
+
+            -- Cancel stamp if one was running
+					stamp_active <= '0';
+					stamp_shape  <= NONE;
+					dx <= 0;
+					dy <= 0;
+				end if;
+				clr_prev <= clr_sync2;
+				
+	
+        -- If we are clearing, keep incrementing address each clock
+        if clear_active = '1' then
+            if clear_addr = FB_SIZE-1 then
+                clear_active <= '0';
+            else
+                clear_addr <= clear_addr + 1;
+            end if;
+					
+		  else		
             -- Stamp state machine
             if stamp_active = '0' then
 					 if kht_sync2 = '0' then
@@ -292,11 +338,12 @@ begin
                     else
                         dx <= dx + 1;
                     end if;
-                end if;
-            end if;
-        end if;
+						end if;
+					end if;
+				end if; -- clear_active
+        end if;	-- rising edge
     end process;
-
+	 
     --------------------------------------------------------------------
     -- Output color: cursor overlay > framebuffer color > background
     --------------------------------------------------------------------
