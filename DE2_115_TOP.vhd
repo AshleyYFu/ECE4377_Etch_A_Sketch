@@ -139,8 +139,8 @@ architecture structural of DE2_115_TOP is
     signal pixel_row_int    : std_logic_vector(9 downto 0);
     signal pixel_column_int : std_logic_vector(9 downto 0);
 
-    signal x_count : integer range 0 to 999;
-    signal y_count : integer range 0 to 999;
+    signal x_count : integer range 0 to 639;
+    signal y_count : integer range 0 to 479;
 
 
 begin
@@ -173,7 +173,8 @@ begin
 
    U_X : entity work.rotary_encoder
    generic map (
-        START_COUNT => 320
+        START_COUNT => 320,
+		  MAX_COUNT   => 640
     )
     port map (
         CLOCK_50 => CLOCK_50,
@@ -185,7 +186,8 @@ begin
 
     U_Y : entity work.rotary_encoder
     generic map (
-        START_COUNT => 240
+        START_COUNT => 240,
+		  MAX_COUNT   => 480
     )
     port map (
         CLOCK_50 => CLOCK_50,

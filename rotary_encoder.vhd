@@ -4,14 +4,15 @@ use ieee.numeric_std.all;
 
 entity rotary_encoder is
 generic (
-        START_COUNT : integer := 0
+        START_COUNT : integer := 0;
+		  MAX_COUNT   : integer := 1000  -- default wrap is 0..999 
     );
     port (
         CLOCK_50 : in  std_logic;
         RESET_N  : in  std_logic;
         ENC_A    : in  std_logic;
         ENC_B    : in  std_logic;
-        COUNT    : out integer range 0 to 999
+        COUNT    : out integer
     );
 end rotary_encoder;
 
@@ -25,7 +26,7 @@ architecture rtl of rotary_encoder is
     signal prev_state : std_logic_vector(1 downto 0) := "11";
 
     -- Count value
-    signal dec_count : integer range 0 to 999 := 0;
+    signal dec_count : integer range 0 to MAX_COUNT-1 := 0;
 
 begin
 
@@ -57,14 +58,14 @@ begin
                 case prev_state is
                     when "00" =>
                         if new_state = "01" then
-                            if dec_count = 999 then
+                            if dec_count = MAX_COUNT-1 then
                                 dec_count <= 0;
                             else
                                 dec_count <= dec_count + 1;
                             end if;
                         elsif new_state = "10" then
                             if dec_count = 0 then
-                                dec_count <= 999;
+                                dec_count <= MAX_COUNT-1;
                             else
                                 dec_count <= dec_count - 1;
                             end if;
@@ -72,14 +73,14 @@ begin
 
                     when "01" =>
                         if new_state = "11" then
-                            if dec_count = 999 then
+                            if dec_count = MAX_COUNT-1 then
                                 dec_count <= 0;
                             else
                                 dec_count <= dec_count + 1;
                             end if;
                         elsif new_state = "00" then
                             if dec_count = 0 then
-                                dec_count <= 999;
+                                dec_count <= MAX_COUNT-1;
                             else
                                 dec_count <= dec_count - 1;
                             end if;
@@ -87,14 +88,14 @@ begin
 
                     when "11" =>
                         if new_state = "10" then
-                            if dec_count = 999 then
+                            if dec_count = MAX_COUNT-1 then
                                 dec_count <= 0;
                             else
                                 dec_count <= dec_count + 1;
                             end if;
                         elsif new_state = "01" then
                             if dec_count = 0 then
-                                dec_count <= 999;
+                                dec_count <= MAX_COUNT-1;
                             else
                                 dec_count <= dec_count - 1;
                             end if;
@@ -102,14 +103,14 @@ begin
 
                     when "10" =>
                         if new_state = "00" then
-                            if dec_count = 999 then
+                            if dec_count = MAX_COUNT-1 then
                                 dec_count <= 0;
                             else
                                 dec_count <= dec_count + 1;
                             end if;
                         elsif new_state = "11" then
                             if dec_count = 0 then
-                                dec_count <= 999;
+                                dec_count <= MAX_COUNT-1;
                             else
                                 dec_count <= dec_count - 1;
                             end if;

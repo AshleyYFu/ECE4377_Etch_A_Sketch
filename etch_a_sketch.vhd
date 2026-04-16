@@ -52,8 +52,8 @@ architecture behavior of etch_a_sketch is
 
 begin
     -- Encoder count mapped to screen coordinates
-    cursor_x <= x_count mod 640;
-    cursor_y <= y_count mod 480;
+    cursor_x <= x_count;
+    cursor_y <= y_count;
 
     U_DRAW : drawing_engine
         port map (
